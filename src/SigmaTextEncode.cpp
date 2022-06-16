@@ -23,8 +23,8 @@ void sigmaEncode(char* buffer, uint16 buffer_start, uint16 buffer_end) {
       case ']':
         buffer[i] = 0x1E;
         break;
-        // TODO: add more characters
 
+        // TODO: add more characters
       default:
         // discard command codes
         if (c >= 0x80 && c <= 0x8F) {
