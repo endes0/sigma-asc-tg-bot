@@ -32,6 +32,11 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
     if (node->ToText()) {
       // get the text and add it to the final
       memcpy(buffer + buffer_pos, node->Value(), strlen(node->Value()));
+
+      // fix the encoding
+      sigmaEncode(buffer, buffer_pos, buffer_pos + strlen(node->Value()));
+      
+      // update the buffer position
       buffer_pos += strlen(node->Value());
     }
 
