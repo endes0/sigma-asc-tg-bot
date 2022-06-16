@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>
 
 #include "SigmaCmdMap.h"
+#include "SigmaTextEncode.h"
 #include "tinyxml2.h"
 
 /*
@@ -12,6 +13,7 @@ const char* ssid = "xxxxxxxxx";                       // SSID WiFi network
 const char* pass = "xxxxxxxxx";                       // Password  WiFi network
 const char* token =
     "xxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // Telegram token
+#define LED_DISPLAY_PIN 2
 
 /*
  * Global objects
@@ -32,6 +34,11 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
     if (node->ToText()) {
       // get the text and add it to the final
       memcpy(buffer + buffer_pos, node->Value(), strlen(node->Value()));
+
+      // fix the encoding
+      sigmaEncode(buffer, buffer_pos, buffer_pos + strlen(node->Value()));
+      
+      // update the buffer position
       buffer_pos += strlen(node->Value());
     }
 
