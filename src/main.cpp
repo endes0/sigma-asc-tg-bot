@@ -18,11 +18,14 @@ const char* token =
  */
 CTBot myBot;
 
+SoftwareSerial ledSerial(-1, LED_DISPLAY_PIN, true);
+
 tinyxml2::XMLDocument doc;
 char final[1024];
 
 // WARN: This function does not check if overflow the buffer
 // TODO: Check if overflow the buffer
+// TODO: center the text
 uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
   while (node) {
     // check if it is a text node
@@ -76,6 +79,10 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting...");
 
+  // initialize the communication with the led board
+  ledSerial.begin(2400);
+
+  // initialize the bot
   myBot.wifiConnect(ssid, pass);
   myBot.setTelegramToken(token);
 
@@ -134,7 +141,10 @@ void loop() {
         }
         Serial.println();
 
-        // TODO: send to the led panel
+        // send to the led panel
+        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
+        ledSerial.write(final, pos);
+        ledSerial.write(0x80);
       } else if (msg.text.startsWith("/ping")) {
         // send system info
         myBot.sendMessage(msg.sender.id, "Pong! Current free heap: " +
