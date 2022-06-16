@@ -43,4 +43,4 @@
 
 char xmlNameToCode(const char* name);
 
-#endif  // !SIGMAC
+#endif  // !SIGMACMDMAP_H

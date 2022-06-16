@@ -19,12 +19,13 @@ const char* token =
  * Global objects
  */
 CTBot myBot;
-
 SoftwareSerial ledSerial(-1, LED_DISPLAY_PIN, true);
-
 tinyxml2::XMLDocument doc;
 char final[1024];
 
+/*
+ * Functions
+ */
 // WARN: This function does not check if overflow the buffer
 // TODO: Check if overflow the buffer
 // TODO: center the text
@@ -37,7 +38,7 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
 
       // fix the encoding
       sigmaEncode(buffer, buffer_pos, buffer_pos + strlen(node->Value()));
-      
+
       // update the buffer position
       buffer_pos += strlen(node->Value());
     }
@@ -81,6 +82,10 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
   return buffer_pos;
 };
 
+
+/*
+ * Main
+ */
 void setup() {
   // initialize serial communication
   Serial.begin(115200);
@@ -109,7 +114,6 @@ void loop() {
 
   // check for new messages
   if (myBot.getNewMessage(msg)) {
-    // Serial.println(" Free heap: " + String(ESP.getFreeHeap()));
     Serial.print("New message: ");
     Serial.println(msg.text);
     // check if the message is a command
