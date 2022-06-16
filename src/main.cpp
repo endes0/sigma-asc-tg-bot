@@ -1,7 +1,6 @@
 #include <Arduino.h>
-#include <AsyncTelegram2.h>
-#include <ESP8266WiFi.h>
-#include <time.h>
+#include <CTBot.h>
+#include <SoftwareSerial.h>
 
 #include "SigmaCmdMap.h"
 #include "tinyxml2.h"
@@ -9,7 +8,6 @@
 /*
  * Configuration
  */
-const char* timezone = "CET-1CEST,M3.5.0,M10.5.0/3";  // Timezone
 const char* ssid = "xxxxxxxxx";                       // SSID WiFi network
 const char* pass = "xxxxxxxxx";                       // Password  WiFi network
 const char* token =
@@ -18,10 +16,10 @@ const char* token =
 /*
  * Global objects
  */
-BearSSL::WiFiClientSecure client;
-BearSSL::Session session;
-BearSSL::X509List certificate(telegram_cert);
-AsyncTelegram2 myBot(client);
+CTBot myBot;
+
+tinyxml2::XMLDocument doc;
+char final[1024];
 
 // WARN: This function does not check if overflow the buffer
 // TODO: Check if overflow the buffer
@@ -31,6 +29,7 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
     if (node->ToText()) {
       // get the text and add it to the final
       memcpy(buffer + buffer_pos, node->Value(), strlen(node->Value()));
+      buffer_pos += strlen(node->Value());
     }
 
     // check if it is wait or speed
@@ -74,27 +73,13 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
 
 void setup() {
   // initialize serial communication
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Starting...");
 
-  // initialize WiFi connection
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  // initialize client connection
-  configTime(timezone, "pool.ntp.org", "time.nist.gov", "time.windows.com");
-  client.setSession(&session);
-  client.setTrustAnchors(&certificate);
-  client.setBufferSizes(1024, 1024);
-
-  // initialize Telegram bot
-  myBot.setUpdateTime(2000);
+  myBot.wifiConnect(ssid, pass);
   myBot.setTelegramToken(token);
-  if (myBot.begin()) {
+
+  if (myBot.testConnection()) {
     Serial.println("Bot started");
   } else {
     Serial.println("Bot failed to start");
@@ -106,30 +91,38 @@ void setup() {
 
 void loop() {
   TBMessage msg;
+  Serial.println("Waiting for message...");
 
   // check for new messages
   if (myBot.getNewMessage(msg)) {
+    // Serial.println(" Free heap: " + String(ESP.getFreeHeap()));
+    Serial.print("New message: ");
+    Serial.println(msg.text);
     // check if the message is a command
     if (msg.text.startsWith("/")) {
       // check what type of command it is
       if (msg.text.startsWith("/composition")) {
-        char final[4096];
         uint16 pos = 0;
 
+        Serial.println("Received composition.");
+
         // read the xml
-        tinyxml2::XMLDocument doc;
         doc.Parse(msg.text.substring(12).c_str());
         if (doc.Error()) {
-          myBot.sendMessage(msg, "Error parsing XML");
+          myBot.sendMessage(msg.sender.id, "Error parsing XML");
           return;
         }
+
+        Serial.println("Parsed XML.");
 
         // get the root element
         tinyxml2::XMLElement* root = doc.FirstChildElement("composition");
         if (!root) {
-          myBot.sendMessage(msg, "Error parsing XML");
+          myBot.sendMessage(msg.sender.id, "Error parsing XML");
           return;
         }
+
+        Serial.print("Processing composition...");
 
         // process the nodes
         pos = process_nodes(root->FirstChild(), final, 0);
@@ -142,7 +135,13 @@ void loop() {
         Serial.println();
 
         // TODO: send to the led panel
+      } else if (msg.text.startsWith("/ping")) {
+        // send system info
+        myBot.sendMessage(msg.sender.id, "Pong! Current free heap: " +
+                                             String(ESP.getFreeHeap()));
       }
     }
   }
+
+  delay(500);
 }
