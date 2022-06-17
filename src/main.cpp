@@ -129,7 +129,8 @@ void loop() {
 
         Serial.println("Received composition.");
 
-        // read the xml
+        // TODO: move to SigmaLib
+        //  read the xml
         doc.Parse(msg.text.substring(12).c_str());
         if (doc.Error()) {
           myBot.sendMessage(msg.sender.id, "Error parsing XML");
@@ -154,10 +155,45 @@ void loop() {
         ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
         ledSerial.write(final, pos);
         ledSerial.write(0x80);
+      } else if (msg.text.startsWith("/display")) {
+        Serial.println("Received display.");
+
+        String text = "[" + msg.sender.username + "]" + msg.text.substring(9);
+
+        // add spaces to the text if it is not long enough
+        while (text.length() < 16) {
+          text += " ";
+        }
+
+        // fix encoding
+        strcpy(final, text.c_str());
+        sigmaEncode(final, 0, text.length());
+
+        // send to the led panel
+        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB\x81");
+        ledSerial.write(final, text.length());
+        ledSerial.write(
+            "\x8F\x39\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A"
+            "\x3A\x3A\x80");
       } else if (msg.text.startsWith("/ping")) {
         // send system info
         myBot.sendMessage(msg.sender.id, "Pong! Current free heap: " +
                                              String(ESP.getFreeHeap()));
+      } else if (msg.text.startsWith("/fuzz")) {
+        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
+
+        for (size_t i = 0; i < 255; i++) {
+          if (i >= 0x80 && i <= 0x8F) {
+            continue;
+          }
+
+          ledSerial.print(i);
+          ledSerial.write(":");
+          ledSerial.write(i);
+          ledSerial.write(":::");
+        }
+
+        ledSerial.write("\x80");
       }
     }
   }
