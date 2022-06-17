@@ -26,8 +26,9 @@ char final[1024];
  */
 // WARN: This function does not check if overflow the buffer
 // TODO: Check if overflow the buffer
-// TODO: center the text
-uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
+// TODO: move to SigmaLib
+uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos,
+                     bool center) {
   while (node) {
     // check if it is a text node
     if (node->ToText()) {
@@ -71,15 +72,21 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos) {
       }
     }
 
+    // check if has nocenter attribute
+    const tinyxml2::XMLAttribute* nocenter =
+        node->ToElement()->FindAttribute("noalign");
+    if (nocenter) {
+      center = false;
+    }
+
     // recursively process the child nodes
-    buffer_pos = process_nodes(node->FirstChild(), buffer, buffer_pos);
+    buffer_pos = process_nodes(node->FirstChild(), buffer, buffer_pos, center);
 
     // get the next node
     node = node->NextSibling();
   }
   return buffer_pos;
 };
-
 
 /*
  * Main
@@ -141,14 +148,7 @@ void loop() {
         Serial.print("Processing composition...");
 
         // process the nodes
-        pos = process_nodes(root->FirstChild(), final, 0);
-
-        // debug print the final
-        Serial.print("Final: ");
-        for (uint16 i = 0; i < pos; i++) {
-          Serial.print(final[i]);
-        }
-        Serial.println();
+        pos = process_nodes(root->FirstChild(), final, 0, true);
 
         // send to the led panel
         ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
