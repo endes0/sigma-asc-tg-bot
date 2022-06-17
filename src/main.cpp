@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>
 
 #include "SigmaCmdMap.h"
+#include "SigmaTextEncode.h"
 #include "tinyxml2.h"
 
 /*
@@ -12,6 +13,7 @@ const char* ssid = "xxxxxxxxx";                       // SSID WiFi network
 const char* pass = "xxxxxxxxx";                       // Password  WiFi network
 const char* token =
     "xxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // Telegram token
+#define LED_DISPLAY_PIN 2
 
 /*
  * Global objects
