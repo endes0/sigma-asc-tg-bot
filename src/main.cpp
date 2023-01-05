@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <CTBot.h>
+#include <FastBot.h>
 #include <SoftwareSerial.h>
 
 #include "SigmaCmdMap.h"
@@ -31,21 +31,22 @@ char final[1024];
 // TODO: move to SigmaLib
 uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos,
                      bool center) {
-  while (node) {
+  while (node != NULL) {
     // check if it is a text node
-    if (node->ToText()) {
+    tinyxml2::XMLText* textNode = node->ToText();
+    if (textNode != NULL && textNode->Value() != NULL &&
+        strlen(textNode->Value()) > 0) {
       // get the text and add it to the final
-      memcpy(buffer + buffer_pos, node->Value(), strlen(node->Value()));
+      memcpy(buffer + buffer_pos, textNode->Value(), strlen(textNode->Value()));
 
       // fix the encoding
-      sigmaEncode(buffer, buffer_pos, buffer_pos + strlen(node->Value()));
+      sigmaEncode(buffer, buffer_pos, buffer_pos + strlen(textNode->Value()));
 
       // update the buffer position
-      buffer_pos += strlen(node->Value());
+      buffer_pos += strlen(textNode->Value());
     }
 
-    // check if it is wait or speed
-    if (node->ToElement()) {
+    if (node->ToElement() != NULL) {
       // get the name of the element and lowercase it
       String name = String(node->ToElement()->Name());
       name.toLowerCase();
@@ -72,13 +73,13 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos,
         }
         buffer[buffer_pos++] = 0x30 + time->IntValue();
       }
-    }
 
-    // check if has nocenter attribute
-    const tinyxml2::XMLAttribute* nocenter =
-        node->ToElement()->FindAttribute("noalign");
-    if (nocenter) {
-      center = false;
+      // check if has nocenter attribute
+      const tinyxml2::XMLAttribute* nocenter =
+          node->ToElement()->FindAttribute("noalign");
+      if (nocenter) {
+        center = false;
+      }
     }
 
     // recursively process the child nodes
