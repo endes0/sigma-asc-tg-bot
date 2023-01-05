@@ -18,7 +18,7 @@ const char* token =
 /*
  * Global objects
  */
-CTBot myBot;
+FastBot bot(token);
 SoftwareSerial ledSerial(-1, LED_DISPLAY_PIN, true);
 tinyxml2::XMLDocument doc;
 char final[1024];
@@ -90,6 +90,86 @@ uint16 process_nodes(tinyxml2::XMLNode* node, char* buffer, uint16 buffer_pos,
   return buffer_pos;
 };
 
+void newMsg(FB_msg& msg) {
+  // check if the message is a command
+  if (msg.text.startsWith("/")) {
+    // check what type of command it is
+    if (msg.text.startsWith("/composition")) {
+      uint16 pos = 0;
+
+      Serial.println("Received composition.");
+
+      // TODO: move to SigmaLib
+      //  read the xml
+      doc.Parse(msg.text.substring(12).c_str());
+      if (doc.Error()) {
+        bot.sendMessage("Error parsing XML", msg.chatID);
+        return;
+      }
+
+      Serial.println("Parsed XML.");
+
+      // get the root element
+      tinyxml2::XMLElement* root = doc.FirstChildElement("composition");
+      if (!root) {
+        bot.sendMessage("Error parsing XML", msg.chatID);
+        return;
+      }
+
+      Serial.print("Processing composition...");
+
+      // process the nodes
+      pos = process_nodes(root->FirstChild(), final, 0, true);
+
+      Serial.println("Sending to display: ");
+      //Format in hexadecimal
+      for (int i = 0; i < pos; i++) {
+        Serial.print(final[i], HEX);
+        Serial.print(" ");
+      }
+      Serial.println();
+
+      // send to the led panel
+      ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
+      ledSerial.write(final, pos);
+      ledSerial.write(0x80);
+    } else if (msg.text.startsWith("/display")) {
+      Serial.println("Received display.");
+
+      String text = "[" + msg.username + "]" + msg.text.substring(9);
+
+      // add spaces to the text if it is not long enough
+      while (text.length() < 16) {
+        text += " ";
+      }
+
+      // fix encoding
+      strcpy(final, text.c_str());
+      sigmaEncode(final, 0, text.length());
+
+      Serial.println("Sending to display: ");
+      //Format in hexadecimal
+      for (int i = 0; i < text.length(); i++) {
+        Serial.print(final[i], HEX);
+        Serial.print(" ");
+      }
+      Serial.println();
+
+
+      // send to the led panel
+      ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB\x81");
+      ledSerial.write(final, text.length());
+      ledSerial.write(
+          "\x8F\x39\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A"
+          "\x3A\x3A\x80");
+    } else if (msg.text.startsWith("/ping")) {
+      // send system info
+      bot.sendMessage("Pong! Current free heap: " + String(ESP.getFreeHeap()),
+                      msg.chatID);
+    }
+  }
+}
+
 /*
  * Main
  */
@@ -101,104 +181,16 @@ void setup() {
   // initialize the communication with the led board
   ledSerial.begin(2400);
 
-  // initialize the bot
-  myBot.wifiConnect(ssid, pass);
-  myBot.setTelegramToken(token);
-
-  if (myBot.testConnection()) {
-    Serial.println("Bot started");
-  } else {
-    Serial.println("Bot failed to start");
-    // wait and restart
-    delay(5000);
-    ESP.restart();
+  // initialize the wifi
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
+  Serial.println("WiFi connected");
+
+  // initialize the telegram bot
+  bot.attach(newMsg);
 }
 
-void loop() {
-  TBMessage msg;
-  Serial.println("Waiting for message...");
-
-  // check for new messages
-  if (myBot.getNewMessage(msg)) {
-    Serial.print("New message: ");
-    Serial.println(msg.text);
-    // check if the message is a command
-    if (msg.text.startsWith("/")) {
-      // check what type of command it is
-      if (msg.text.startsWith("/composition")) {
-        uint16 pos = 0;
-
-        Serial.println("Received composition.");
-
-        // TODO: move to SigmaLib
-        //  read the xml
-        doc.Parse(msg.text.substring(12).c_str());
-        if (doc.Error()) {
-          myBot.sendMessage(msg.sender.id, "Error parsing XML");
-          return;
-        }
-
-        Serial.println("Parsed XML.");
-
-        // get the root element
-        tinyxml2::XMLElement* root = doc.FirstChildElement("composition");
-        if (!root) {
-          myBot.sendMessage(msg.sender.id, "Error parsing XML");
-          return;
-        }
-
-        Serial.print("Processing composition...");
-
-        // process the nodes
-        pos = process_nodes(root->FirstChild(), final, 0, true);
-
-        // send to the led panel
-        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
-        ledSerial.write(final, pos);
-        ledSerial.write(0x80);
-      } else if (msg.text.startsWith("/display")) {
-        Serial.println("Received display.");
-
-        String text = "[" + msg.sender.username + "]" + msg.text.substring(9);
-
-        // add spaces to the text if it is not long enough
-        while (text.length() < 16) {
-          text += " ";
-        }
-
-        // fix encoding
-        strcpy(final, text.c_str());
-        sigmaEncode(final, 0, text.length());
-
-        // send to the led panel
-        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB\x81");
-        ledSerial.write(final, text.length());
-        ledSerial.write(
-            "\x8F\x39\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A\x3A"
-            "\x3A\x3A\x80");
-      } else if (msg.text.startsWith("/ping")) {
-        // send system info
-        myBot.sendMessage(msg.sender.id, "Pong! Current free heap: " +
-                                             String(ESP.getFreeHeap()));
-      } else if (msg.text.startsWith("/fuzz")) {
-        ledSerial.write("\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xBB");
-
-        for (size_t i = 0; i < 255; i++) {
-          if (i >= 0x80 && i <= 0x8F) {
-            continue;
-          }
-
-          ledSerial.print(i);
-          ledSerial.write(":");
-          ledSerial.write(i);
-          ledSerial.write(":::");
-        }
-
-        ledSerial.write("\x80");
-      }
-    }
-  }
-
-  delay(500);
-}
+void loop() { bot.tick(); }
